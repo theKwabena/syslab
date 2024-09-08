@@ -6,7 +6,8 @@ from docker import DockerClient
 
 class DockerService:
     def __init__(self, hosts: List[str] = None):
-        self.hosts = cycle(hosts)
+        self.hosts = hosts
+        self.hosts_cycle = cycle(self.hosts)
 
     @staticmethod
     def test_client(client: docker.DockerClient) -> bool:
@@ -18,11 +19,51 @@ class DockerService:
 
     def get_host(self) -> DockerClient:
         client = None
-        try:
-            client = DockerClient(base_url=next(self.hosts))
-        except docker.errors.DockerException as e:
-            pass
+
+        attempts = 0
+        num_of_hosts = len(self.hosts)
+        while attempts < num_of_hosts:
+            try:
+                client = DockerClient(base_url=next(self.hosts_cycle))
+                break
+            except docker.errors.DockerException as e:
+                attempts += 1
+
         return client
+
+    @staticmethod
+    def container_exists(container_name: str, client: DockerClient) -> bool:
+        try:
+            client.containers.get(container_name)
+            return True
+        except docker.errors.NotFound:
+            return False
+
+    @staticmethod
+    def create_container(container_name: str, client: docker.DockerClient) -> str:
+        try:
+            container = client.containers.run(
+                tty=True,
+                detach=True,
+                name=container_name,
+                stdin_open=True,
+                image="ubuntu:latest",
+                entrypoint="/bin/bash",
+            )
+            return container.id
+        except Exception as e:
+            pass
+
+    def create_user_environment(self, username) -> str:
+        client = self.get_host()
+        if client is None:
+            raise Exception("Docker client is not available")
+
+        if DockerService.container_exists(username, client):
+            raise Exception("Docker container already exists")
+        else:
+            container = DockerService.create_container(username, client)
+            return container
 
     def get_user_container_id(self, username) -> str:
         client = self.get_host()
