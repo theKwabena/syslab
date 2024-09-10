@@ -1,3 +1,4 @@
+#file: noinspection YAMLSchemaValidation
 services:
   backend:
     build:
@@ -6,13 +7,15 @@ services:
     command: fastapi dev --host 0.0.0.0 --port 8000
     ports:
       - 8000:8000
-    environment:
-      - DATABASE_PATH=${DATABASE_NAME}
+#    environment:
+#      - DATABASE_PATH=${DATABASE_NAME}
     networks:
       - sms-ntc-net
     volumes:
       - ./backend:/app
-      - /mnt/backup/unix-lab-db:/app/database
+      - type: bind
+        source: /mnt/backup/unix-lab.db
+        target: /etc/unix-lab/unix-lab.db
 
 networks:
   sms-ntc-net:

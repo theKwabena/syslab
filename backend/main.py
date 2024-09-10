@@ -1,13 +1,14 @@
-import docker
-import asyncio
-from fastapi import FastAPI, WebSocket, responses
+from fastapi import FastAPI
+from config.database import create_db_and_tables
+from routes.user import lab_router
+from routes.container import container_router
 
 app = FastAPI()
+app.include_router(lab_router)
+app.include_router(container_router)
 
-async def login():
-    # Check user with freeipa or ad.
-    # if user exists, check sqlite for container with name and id
-    # check if container is running or starts it
-    # if container is running, send the container id to the frontend for mount.
-    # Frontend gets id and mounts it with xterm.
-    pass
+
+@app.on_event("startup")
+def on_startup():
+    print("Creating DB Tables")
+    create_db_and_tables()
