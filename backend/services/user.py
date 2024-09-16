@@ -4,6 +4,8 @@ from models.user import User
 from pydantic import EmailStr
 from fastapi import Query
 
+from config.security import verify_password, get_password_hash
+
 
 class UserService:
 
@@ -16,19 +18,18 @@ class UserService:
             return False
         return True
 
-    @staticmethod
     def create_user(self, user: UserCreate):
-        db_user = User.model_validate(user)
+        db_user = User.model_validate(
+            user, update={"password": get_password_hash(user.password)}
+        )
         self.session.add(db_user)
         self.session.commit()
         self.session.refresh(db_user)
         return db_user
 
-    @staticmethod
-    def get_user(self, username: str) -> User:
+    def get_user(self, username: str) -> User | None:
         user = self.session.get(User, username)
-        if not user:
-            pass
+        return user
 
     def get_users(
             self,
@@ -56,6 +57,14 @@ class UserService:
         self.session.add(user)
         self.session.flush()
         self.session.refresh(user)
+        return user
+
+    def authenticate(self, email: str, password: str) -> User | None:
+        user = self.get_user(email)
+        if not User:
+            return None
+        if not verify_password(password, user.password):
+            return None
         return user
 
 

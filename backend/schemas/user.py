@@ -12,3 +12,4 @@ class UserCreate(SQLModel):
 
 class UserRead(UserBase):
     username: str
+    password: str

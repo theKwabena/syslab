@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     DOMAIN: str = "localhost"
     PROJECT_NAME: str = ""
     PROJECT_API_VERSION: str = "/api/v1"
-    DOCKER_HOST_URL : str = "tcp://localhost:2375"
+    DOCKER_HOST_URL : str = "tcp://192.168.1.154:2376"
 
     # ------------------------------------------------------------
     # security config definitions

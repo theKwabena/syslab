@@ -9,7 +9,7 @@ from config.settings import settings
 
 
 class DockerService:
-    def __init__(self, user_service = Depends(get_user_service)):
+    def __init__(self, user_service=Depends(get_user_service)):
         self.user_service = user_service
         try:
             self.client = DockerClient(settings.DOCKER_HOST_URL)
@@ -44,15 +44,16 @@ class DockerService:
             )
             return container.id
         except Exception as e:
+            print(e)
             print("Host not found")
 
     def get_user_environment(self, username) -> Container:
         container = None
         user = self.user_service.get_user(username)
         if user is None:
-            raise Exception # TODO
+            raise Exception  # TODO
         if user.container is not None:
-            if self.container_exists(user.container.id):
+            if self.container_exists(user.container.container_name):
                 container = user.container
             else:
                 self.create_container(user.username)

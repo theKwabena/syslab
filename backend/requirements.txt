@@ -40,4 +40,6 @@ greenlet==3.0.3
 SQLAlchemy==2.0.34
 sqlmodel==0.0.22
 pydantic-settings==2.4.0
+passlib==1.7.4
+PyJWT==2.9.0
 
