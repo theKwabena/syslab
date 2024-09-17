@@ -32,7 +32,7 @@ def get_user_service(session=Depends(get_session)):
 def get_current_user(token: TokenDep, user_service: UserService = Depends(get_user_service)) -> User:
     try:
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
+            token, settings.JWT_SECRET_KEY, algorithms=[security.ALGORITHM]
         )
         token_data = TokenPayload(**payload)
     except (InvalidTokenError, ValidationError):
@@ -51,7 +51,7 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 def get_current_active_superuser(current_user: CurrentUser) -> User:
-    if not current_user.is_superuser:
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=403, detail="The user doesn't have enough privileges"
         )

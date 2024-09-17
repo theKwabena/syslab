@@ -18,10 +18,11 @@ class UserService:
             return False
         return True
 
-    def create_user(self, user: UserCreate):
+    def create_user(self, user: UserCreate, is_admin: bool):
         db_user = User.model_validate(
             user, update={"password": get_password_hash(user.password)}
         )
+        db_user.is_admin = is_admin
         self.session.add(db_user)
         self.session.commit()
         self.session.refresh(db_user)

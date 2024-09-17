@@ -5,7 +5,7 @@ from schemas.user import UserRead, UserCreate
 from core.typedef import UserServiceDep
 
 from typing import Any
-from deps.user import CurrentUser
+from deps.user import CurrentUser, get_current_active_superuser
 
 from config import security
 from config.settings import settings
@@ -35,7 +35,12 @@ async def delete_user(user_id: str, user_service: UserServiceDep):
 
 @lab_router.post('/users')
 async def create_user(user_service: UserServiceDep, data: UserCreate):
-    return user_service.create_user(data)
+    return user_service.create_user(data, False)
+
+
+@lab_router.post('/users/admin',dependencies=[Depends(get_current_active_superuser)])
+async def create_admin_user(user_service: UserServiceDep, data: UserCreate):
+    return user_service.create_user(data, True)
 
 
 @lab_router.post("/login/access-token")
