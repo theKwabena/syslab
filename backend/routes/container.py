@@ -9,3 +9,12 @@ container_router = APIRouter(prefix="", tags=["Lab"])
 async def create_container(container_service: ContainerService):
     return container_service.create_container("abbey")
 
+
+@container_router.get('/container')
+async def get_containers(container_service: ContainerService):
+    return container_service.list_host_containers()
+
+
+@container_router.get('/user-containers')
+async def get_containers(container_service: ContainerService):
+    return container_service.list_user_containers()

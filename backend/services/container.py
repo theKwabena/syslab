@@ -6,11 +6,16 @@ from typedef import UserServiceDep
 from .user import UserService
 from models.container import Container
 from config.settings import settings
+from core.deps import get_session
+from sqlmodel import select, Session
+
+from schemas.container import HostContainer
 
 
 class DockerService:
-    def __init__(self, user_service=Depends(get_user_service)):
-        self.user_service = user_service
+    def __init__(self, session: Session):
+        self.session = session
+        self.user_service = UserService(session)
         try:
             self.client = DockerClient(settings.DOCKER_HOST_URL)
         except docker.errors.DockerException as e:
@@ -26,45 +31,89 @@ class DockerService:
             return False
 
     def container_exists(self, container_name: str) -> bool:
+        container_name = f"username-{container_name}"
         try:
             self.client.containers.get(container_name)
             return True
         except docker.errors.NotFound:
             return False
 
-    def create_container(self, container_name: str) -> str:
+    def list_host_containers(self):
+        container_list = []
         try:
+            containers = self.client.containers.list()
+            for container in containers:
+                container_list.append(
+                    HostContainer(
+                        id=container.id,
+                        name=container.name,
+                        status=container.status,
+                        image=container.image.tags[0] if container.image.tags else 'unknown',
+                    )
+                )
+            return container_list
+        except docker.errors.NotFound:
+            return None
+
+    def list_user_containers(self) -> list[Container]:
+        containers = self.session.exec(select(Container)).all()
+        return containers
+
+    def get_last_container(self) -> Container | None:
+        stmt = select(Container).order_by(Container.id.desc()).limit(1)
+        return self.session.exec(stmt).first()
+
+    def create_container(self, container_name: str) -> Container:
+        try:
+            last_container = self.get_last_container()
+            if last_container:
+                last_used_dns_ports = last_container.dns_port
+                last_used_web_ports = last_container.web_port
+            else:
+                last_used_dns_ports = 5500
+                last_used_web_ports = 8000
+            web_port = (last_used_web_ports + 1) if last_used_web_ports else 8000
+            dns_port = (last_used_dns_ports + 1) if last_used_dns_ports else 5500
+            ports = {
+                "80": web_port,
+                "53": dns_port
+            }
             container = self.client.containers.run(
                 tty=True,
                 detach=True,
-                name=container_name,
+                ports=ports,
                 stdin_open=True,
+                name=f"username-{container_name}",
                 image="ubuntu:latest",
                 entrypoint="/bin/bash",
             )
-            return container.id
+
+            db_container = Container(
+                web_port=web_port,
+                dns_port=dns_port,
+                container_id=container.id,
+                container_name=container_name,
+                host_name=settings.DOCKER_HOST_URL,
+            )
+            return db_container
         except Exception as e:
-            print(e)
-            print("Host not found")
+            pass
 
     def get_user_environment(self, username) -> Container:
-        container = None
         user = self.user_service.get_user(username)
-        if user is None:
-            raise Exception  # TODO
-        if user.container is not None:
-            if self.container_exists(user.container.container_name):
-                container = user.container
+        if user is not None:
+            if user.container is not None:
+                if self.container_exists(user.container.container_name):
+                    container = user.container
+                else:
+                    container = self.create_container(user.username)
+                return container
             else:
-                self.create_container(user.username)
-        else:
-            new_container = self.create_container(user.username)
-            container = Container(
-                container_name=new_container,
-            )
-            user.container = container
-            self.user_service.update_user(user)
-        return container
+                container: Container = self.create_container(user.username)
+                user.container = container
+                self.user_service.update_user(user)
+                return user.container
+        raise Exception
 
     # def get_user_container_id(self, username) -> str:
     #     client = self.get_host()

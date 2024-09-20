@@ -56,13 +56,13 @@ class UserService:
 
     def update_user(self, user: User):
         self.session.add(user)
-        self.session.flush()
+        self.session.commit()
         self.session.refresh(user)
         return user
 
     def authenticate(self, email: str, password: str) -> User | None:
         user = self.get_user(email)
-        if not User:
+        if not user:
             return None
         if not verify_password(password, user.password):
             return None

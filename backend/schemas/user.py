@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel
-
+from .container import UserContainer
 
 class UserBase(SQLModel):
     username: str | None = None
@@ -12,4 +12,4 @@ class UserCreate(SQLModel):
 
 class UserRead(UserBase):
     username: str
-    password: str
+    container: UserContainer | None = None

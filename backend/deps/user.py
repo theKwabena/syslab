@@ -22,8 +22,10 @@ TokenDep = Annotated[str, Depends(reusable_oauth2)]
 
 
 def get_user_service(session=Depends(get_session)):
+    print("getting user")
     try:
         user = UserService(session)
+        print("User service heres")
         yield user
     except Exception as e:
         raise e

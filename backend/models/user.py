@@ -8,4 +8,4 @@ class User(SQLModel, table=True):
     is_admin: bool = Field(default=False)
 
     container_id: int | None = Field(default=None, foreign_key="container.id")
-    container: Container | None = Relationship(back_populates="users")
+    container: Container | None = Relationship(back_populates="user")

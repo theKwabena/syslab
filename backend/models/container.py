@@ -4,6 +4,9 @@ from sqlmodel import Relationship, Field, SQLModel
 
 class Container(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    container_name: str
     host_name: str
-    users: List["User"] = Relationship(back_populates="container")
+    web_port: int
+    dns_port: int
+    container_id: str
+    container_name: str
+    user: "User" = Relationship(back_populates="container")

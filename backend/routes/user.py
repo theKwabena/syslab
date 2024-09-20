@@ -13,7 +13,10 @@ from config.settings import settings
 from models.token import Token
 from fastapi import Depends
 from typing import Annotated
+
+from schemas.container import UserContainer
 from fastapi.security import OAuth2PasswordRequestForm
+from core.typedef import ContainerService
 
 lab_router = APIRouter(prefix="", tags=["Lab"])
 
@@ -38,7 +41,7 @@ async def create_user(user_service: UserServiceDep, data: UserCreate):
     return user_service.create_user(data, False)
 
 
-@lab_router.post('/users/admin',dependencies=[Depends(get_current_active_superuser)])
+@lab_router.post('/users/admin', dependencies=[Depends(get_current_active_superuser)])
 async def create_admin_user(user_service: UserServiceDep, data: UserCreate):
     return user_service.create_user(data, True)
 
@@ -47,9 +50,6 @@ async def create_admin_user(user_service: UserServiceDep, data: UserCreate):
 def login_access_token(
         user_service: UserServiceDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ) -> Token:
-    """
-    OAuth2 compatible token login, get an access token for future requests
-    """
     user = user_service.authenticate(form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
@@ -61,13 +61,12 @@ def login_access_token(
     )
 
 
-# @lab_router.get("/containers", response_model=list[UserRead])
-# async def get_containers(session: SessionDep):
-#     return UserService
-
 @lab_router.get("/me", )
-def read_user_me(current_user: CurrentUser) -> Any:
-    """
-    Get current user.
-    """
+def read_user_me(current_user: CurrentUser) -> UserRead:
     return current_user
+
+
+@lab_router.get("/me/container")
+def read_user_environment(current_user: CurrentUser, container_service: ContainerService):
+    user_cont = container_service.get_user_environment(current_user.username)
+    return user_cont
