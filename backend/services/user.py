@@ -5,6 +5,7 @@ from pydantic import EmailStr
 from fastapi import Query
 
 from config.security import verify_password, get_password_hash
+from core.exceptions import EntityDoesNotExistError, EntityAlreadyExistsError
 
 
 class UserService:
@@ -19,6 +20,8 @@ class UserService:
         return True
 
     def create_user(self, user: UserCreate, is_admin: bool):
+        if self.user_exists(user.username):
+            raise EntityAlreadyExistsError(f"User with name {user.username} already exists")
         db_user = User.model_validate(
             user, update={"password": get_password_hash(user.password)}
         )
@@ -28,8 +31,10 @@ class UserService:
         self.session.refresh(db_user)
         return db_user
 
-    def get_user(self, username: str) -> User | None:
+    def get_user(self, username: str) -> User:
         user = self.session.get(User, username)
+        if not user:
+            raise EntityDoesNotExistError(f"User with username {username} not found")
         return user
 
     def get_users(
