@@ -7,6 +7,10 @@ from .user import UserService
 from models.container import Container
 from config.settings import settings
 from core.deps import get_session
+
+from docker.errors import APIError
+
+from core.exceptions import EntityAlreadyExistsError, EntityDoesNotExistError, ServiceError
 from sqlmodel import select, Session
 
 from schemas.container import HostContainer
@@ -19,9 +23,9 @@ class DockerService:
         try:
             self.client = DockerClient(settings.DOCKER_HOST_URL)
         except docker.errors.DockerException as e:
-            print("Cannot connect to Host")
+            raise ServiceError(f"Cannot connect to docker host {e}")
         except Exception as e:
-            raise e
+            raise ServiceError(f"Cannot connect to docker host {e}")
 
     def test_client(self) -> bool:
         try:
@@ -59,21 +63,53 @@ class DockerService:
         containers = self.session.exec(select(Container)).all()
         return containers
 
+    def get_unused_port(self) -> (int, int):
+        web_port = None
+        dns_port = None
+        used_ports = set()
+        try:
+            containers = self.client.containers.list()
+            for container in containers:
+                ports = container.attrs['NetworkSettings']['Ports']
+                for port, mapping in ports.items():
+                    if mapping:
+                        used_ports.add(int(mapping[0]['HostPort']))
+
+            for port in range(settings.DNS_PORT_START, settings.DNS_PORT_END):
+                if port not in used_ports:
+                    dns_port = port
+                    break
+            for port in range(settings.WEB_PORT_START, settings.WEB_PORT_END):
+                if port not in used_ports:
+                    web_port = port
+                    break
+        except Exception as e:
+            raise ServiceError(f"Docker service unavailable {e}")
+        return web_port, dns_port
+
     def get_last_container(self) -> Container | None:
         stmt = select(Container).order_by(Container.id.desc()).limit(1)
         return self.session.exec(stmt).first()
 
-    def create_container(self, container_name: str) -> Container:
+    def login_to_registry(self):
+        result = False
         try:
-            last_container = self.get_last_container()
-            if last_container:
-                last_used_dns_ports = last_container.dns_port
-                last_used_web_ports = last_container.web_port
-            else:
-                last_used_dns_ports = 5500
-                last_used_web_ports = 8000
-            web_port = (last_used_web_ports + 1) if last_used_web_ports else 8000
-            dns_port = (last_used_dns_ports + 1) if last_used_dns_ports else 5500
+            self.client.login(
+                registry=settings.DOCKER_REPO_URL,
+                username=settings.DOCKER_REPO_USER,
+                password=settings.DOCKER_REPO_PASSWORD,
+            )
+            result = True
+        except APIError as e:
+            raise ServiceError(f"Cannot log in to remote repository {e}")
+        return result
+
+    def create_container(self, container_name: str) -> Container:
+        if self.login_to_registry():
+            if self.container_exists(container_name):
+                raise EntityAlreadyExistsError(f"Container with name {container_name} already exist")
+        try:
+            web_port, dns_port = self.get_unused_port()
             ports = {
                 "80": web_port,
                 "53": dns_port
@@ -84,8 +120,9 @@ class DockerService:
                 ports=ports,
                 stdin_open=True,
                 name=f"username-{container_name}",
-                image="ubuntu:latest",
+                image=settings.DEFAULT_UNIX_IMAGE,
                 entrypoint="/bin/bash",
+                restart_policy={"Name": "always"}
             )
 
             db_container = Container(
@@ -96,7 +133,10 @@ class DockerService:
                 host_name=settings.DOCKER_HOST_URL,
             )
             return db_container
+        except docker.errors.APIError as de:
+            raise ServiceError(f"Docker API service  failed {de}")
         except Exception as e:
+            raise ServiceError(f"Docker service failed {e}")
             pass
 
     def get_user_environment(self, username) -> Container:
@@ -113,7 +153,7 @@ class DockerService:
                 user.container = container
                 self.user_service.update_user(user)
                 return user.container
-        raise Exception
+        raise EntityDoesNotExistError(f"User with username {username} does not exist")
 
     # def get_user_container_id(self, username) -> str:
     #     client = self.get_host()
