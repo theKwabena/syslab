@@ -11,7 +11,7 @@ async def create_container(container_service: ContainerService):
 
 
 @container_router.get('/container')
-async def get_containers(container_service: ContainerService):
+async def get_container(container_service: ContainerService):
     return container_service.list_host_containers()
 
 
