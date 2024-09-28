@@ -21,24 +21,27 @@ from core.typedef import ContainerService
 lab_router = APIRouter(prefix="", tags=["Lab"])
 
 
-@lab_router.get('/users', response_model=list[UserRead])
+@lab_router.get('/users', response_model=list[UserRead], dependencies=[Depends(get_current_active_superuser)])
 async def get_users(user_service: UserServiceDep):
     return user_service.get_users()
 
 
-@lab_router.get('/user/{user_id}', response_model=list[UserRead])
-async def get_users(user_id: str, user_service: UserServiceDep):
+@lab_router.get('/user/{user_id}', response_model=UserRead, dependencies=[Depends(get_current_active_superuser)])
+async def get_user(user_id: str, user_service: UserServiceDep):
     return user_service.get_user(user_id)
 
 
-@lab_router.delete('/user/{user_id}')
+@lab_router.delete('/user/{user_id}', dependencies=[Depends(get_current_active_superuser)])
 async def delete_user(user_id: str, user_service: UserServiceDep):
     return user_service.delete_user(user_id)
 
 
-@lab_router.post('/users')
-async def create_user(user_service: UserServiceDep, data: UserCreate):
-    return user_service.create_user(data, False)
+@lab_router.post('/users', dependencies=[Depends(get_current_active_superuser)])
+async def create_user(user_service: UserServiceDep, data: UserCreate, container_service: ContainerService):
+    user = user_service.create_user(data, False)
+    if user is not None:
+        container_service.get_user_environment(user.username)
+    return user
 
 
 @lab_router.post('/users/admin', dependencies=[Depends(get_current_active_superuser)])

@@ -15,17 +15,15 @@ from models.token import TokenPayload, Token
 from models.user import User
 
 reusable_oauth2 = OAuth2PasswordBearer(
-    tokenUrl=f"/login/access-token"
+    tokenUrl=f"/api/login/access-token"
 )
 
 TokenDep = Annotated[str, Depends(reusable_oauth2)]
 
 
 def get_user_service(session=Depends(get_session)):
-    print("getting user")
     try:
         user = UserService(session)
-        print("User service heres")
         yield user
     except Exception as e:
         raise e
