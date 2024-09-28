@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from sqlmodel import SQLModel, create_engine, Session
 from config.settings import settings
 from models.user import User
@@ -9,13 +11,20 @@ CONNECTION_STRING = f"sqlite:///{DB_PATH}"
 
 CONNECTION_ARGS = {"check_same_thread": False}
 
-engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
-engine = create_engine(CONNECTION_STRING,connect_args=CONNECTION_ARGS)
+engine = create_engine(CONNECTION_STRING, connect_args=CONNECTION_ARGS)
+
+
+@lru_cache()
+def get_engine():
+    return create_engine(CONNECTION_STRING, connect_args=CONNECTION_ARGS)
 
 
 def get_session():
     with Session(engine) as session:
-        yield session
+        try:
+            yield session
+        finally:
+            session.close()
 
 
 def create_db_and_tables():
