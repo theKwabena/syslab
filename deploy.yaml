@@ -4,13 +4,8 @@ services:
     build:
       dockerfile: Dockerfile
       context: ./backend
-    command: fastapi dev --host 0.0.0.0 --port 8000
     ports:
       - 8000:8000
-#    environment:
-#      - DATABASE_PATH=${DATABASE_NAME}
-    networks:
-      - sms-ntc-net
     env_file:
       - .env
     volumes:
@@ -33,7 +28,3 @@ services:
 
 volumes:
   db-postgres:
-
-
-networks:
-  sms-ntc-net:
