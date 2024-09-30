@@ -1,5 +1,5 @@
 # SYSLAB - LINUX PLAYGROUND
-This project is designed to provide an interactive environment for practicing Linux commands through a web-based interface. It consists of a Python backend and a Vue.js frontend built with Nuxt.js. When a user logs in, a Docker container is spawned, allowing commands to be sent to it, with results displayed on the screen.
+This project is designed to provide an interactive environment for practicing Linux commands through a web-based interface. It consists of a Python backend and a Vue.js frontend built with Nuxt.js. A user interacts with the container bash shell from the responsive UI.
 
 ## Features
 - User Authentication: Secure login to access the interactive shell.
