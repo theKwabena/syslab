@@ -22,8 +22,8 @@ This project is designed to provide an interactive environment for practicing Li
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/yourusername/linux-practice-project.git
-   cd linux-practice-project
+   git clone https://github.com/theKwabena/syslab.git
+   cd syslab
       
 2. **Configure Environment Variables**:
    Create a .env file in the root of the project with the following variables:
