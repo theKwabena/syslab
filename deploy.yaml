@@ -8,23 +8,18 @@ services:
       - 8000:8000
     env_file:
       - .env
-    volumes:
-      - ./backend:/app
-      - type: bind
-        source: /mnt/backup/unix-lab.db
-        target: /etc/unix-lab/unix-lab.db
-
-#  db:
-#    image: postgres:17rc1-alpine3.20
-#    hostname: lab_db
-#    container_name: lab_db
-#    restart: on-failure
-#    env_file:
-#      - .env
-#    ports:
-#      - "5432:5432"
 #    volumes:
-#      - db-postgres:/var/lib/postgresql/data
+#      - ./backend:/app
+#      - type: bind
+#        source: /mnt/backup/unix-lab.db
+#        target: /etc/unix-lab/unix-lab.db
+
+    frontend:
+      build:
+        dockerfile: Dockerfile
+        context: ./frontend
+      ports:
+        - 3000:3000
 
 volumes:
   db-postgres:
