@@ -1,0 +1,35 @@
+name: Run tests
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Run docker build.
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./dockerfiles/test.Dockerfile
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Cache Composer dependencies
+      uses: actions/cache@v4
+      with:
+        path: vendor
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-composer-
+
+    - name: Prepare and start test environment
+      shell: bash
+      run: |
+        sudo chown -R www-data ./storage ./bootstrap
+        chmod +x ./bin/ci.install.sh
+        ./bin/ci.install.sh
+
+    - name: "Run tests"
+      shell: bash
+      run: |
+        chmod +x ./bin/test.sh
+        ./bin/test.sh --without-tty --color=always --testdox

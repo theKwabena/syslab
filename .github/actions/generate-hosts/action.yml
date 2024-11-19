@@ -1,0 +1,23 @@
+name: Export deployment matrix
+description: Extracts hosts config details from specified json file
+inputs:
+  config_file:
+    required: true
+    description: json file to extract config
+
+outputs:
+  hosts:
+    description: 'Processed host config'
+    value: ${{ steps.export-matrix.outputs.hosts }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: export-matrix
+      shell: bash
+      run: |
+        delimiter="$(openssl rand -hex 8)"
+        JSON="$(cat ${{ inputs.config_file }})"
+        echo "hosts<<${delimiter}" >> "${GITHUB_OUTPUT}"
+        echo "$JSON" >> "${GITHUB_OUTPUT}"
+        echo "${delimiter}" >> "${GITHUB_OUTPUT}"

@@ -1,0 +1,139 @@
+name: Deploying to staging servers
+on:
+  push:
+    branches:
+      - develop
+
+env:
+  PROD_PATH: .
+  ENV_PATH: .env
+  COMPOSE_FILE: docker-compose.prod.yml
+  START_SCRIPT: bin/deploy.start.sh
+  IMAGE_NAME:  ${{ github.event.repository.name || 'attendance-test' }}
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/run-tests
+
+  release:
+    runs-on: ubuntu-latest
+    needs: run-tests
+    outputs:
+      new_version: ${{ steps.versioning.outputs.new_release_version }}
+      release_published: ${{ steps.versioning.outputs.new_release_published }}
+      repo_url: ${{ steps.repo_url.outputs.image_name }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Release to GitHub
+        uses: cycjimmy/semantic-release-action@v4
+        id: versioning
+        with:
+          extra_plugins: |
+            @semantic-release/changelog@6.0.0
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get repository name
+        id: repo_url
+        run: |
+          echo "image_name=${GITHUB_REPOSITORY@L}" >> ${GITHUB_OUTPUT}
+
+  prepare-image:
+      if: needs.release.outputs.release_published == 'true'
+      runs-on: ubuntu-latest
+      needs: release
+      outputs:
+        prod_hosts: ${{ steps.generate-hosts.outputs.hosts }}
+      steps:
+        - uses: actions/checkout@v4
+
+        - uses: ./.github/actions/generate-hosts
+          id: generate-hosts
+          with:
+            config_file: "./.github/data/staging.json"
+
+        - name: Set up QEMU
+          uses: docker/setup-qemu-action@v3
+
+        - name: Login to Container Registry
+          uses: docker/login-action@v3
+          with:
+            password: ${{ secrets.TOKEN }}
+            registry: ${{ vars.REGISTRY_URL }}
+            username: ${{ vars.REGISTRY_USERNAME }}
+
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
+
+        - name: Build and push to container registry
+          uses: docker/build-push-action@v5
+          env:
+            REPO_URL: ${{ needs.release.outputs.repo_url }}
+          with:
+            context: .
+            file: dockerfiles/prod.Dockerfile
+            push: true
+            cache-from: type=gha
+            cache-to: type=gha,mode=max
+            tags: ${{ vars.REGISTRY_URL }}/${{ env.REPO_URL }}:${{ needs.release.outputs.new_version }}
+
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [prepare-image,release]
+    strategy:
+      matrix:
+        server: ${{ fromJson(needs.prepare-image.outputs.prod_hosts) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add secret env contents to .env file
+        env:
+          ENV_CONTENT: ${{ secrets[format('{0}_ENV_VARS', matrix.server.name)] }}
+          REPO_URL: ${{ needs.release.outputs.repo_url }}
+        run: |
+          echo "${ENV_CONTENT}" >  "${{ env.ENV_PATH }}"
+          echo "APP_IMAGE=${{ vars.REGISTRY_URL }}/${{ env.REPO_URL}}":${{ needs.release.outputs.new_version }} >> ${{ env.ENV_PATH}}
+
+      - name: Copy deployment files to remote Server
+        if: ${{ matrix.server.enabled == 'Y' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ matrix.server.hostname }}
+          key: ${{ secrets.TEST_DEPLOY_KEY }}
+          username: ${{ matrix.server.user }}
+          port: ${{ matrix.server.port || 22 }}
+          target: ${{ matrix.server.path }}/${{ env.IMAGE_NAME }}
+          source:  "${{ env.COMPOSE_FILE}}, ${{ env.ENV_PATH }}, ${{ env.START_SCRIPT }} "
+
+      - name: Start services with docker compose
+        if: ${{ matrix.server.enabled == 'Y' }}
+        uses: appleboy/ssh-action@v0.1.5
+        env:
+          REGISTRY_TOKEN: ${{ secrets.TOKEN }}
+          REGISTRY_URL: ${{ vars.REGISTRY_URL }}
+          REGISTRY_USERNAME: ${{ vars.REGISTRY_USERNAME }}
+          BASE_IMAGE: ${{ vars.REGISTRY_URL }}/${{ needs.release.outputs.repo_url }}
+        with:
+          host: ${{ matrix.server.hostname }}
+          key: ${{ secrets.TEST_DEPLOY_KEY }}
+          port: ${{ matrix.server.port || 22 }}
+          username: ${{ matrix.server.user }}
+          envs: REGISTRY_URL,REGISTRY_TOKEN,REGISTRY_USERNAME,ENV_FILE
+
+          script: |
+            echo $REGISTRY_TOKEN | docker login $REGISTRY_URL -u $REGISTRY_USERNAME --password-stdin
+
+            cd ~/${{ env.PROD_PATH }}/${{ env.IMAGE_NAME }}
+
+            chmod +x ${{ env.START_SCRIPT }}
+
+            ${{ env.START_SCRIPT }} ${{ env.COMPOSE_FILE }} ${{env.BASE_IMAGE}}
+
+

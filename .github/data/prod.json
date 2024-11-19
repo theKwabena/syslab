@@ -1,0 +1,11 @@
+[
+  {
+    "name": "TEST",
+    "path": ".",
+    "port": "22",
+    "enabled": "Y",
+    "user": "emma",
+    "tear-down": "N",
+    "host": "meetcount.online"
+  }
+]
