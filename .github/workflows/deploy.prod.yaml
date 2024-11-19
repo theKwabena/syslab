@@ -13,7 +13,6 @@ env:
 
 jobs:
   prepare-image:
-    if: needs.release.outputs.release_published == 'true'
     runs-on: ubuntu-latest
     outputs:
       prod_hosts: ${{ steps.generate-hosts.outputs.hosts }}
