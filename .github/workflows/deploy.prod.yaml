@@ -35,48 +35,5 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Add secret env contents to .env file
-        env:
-          ENV_CONTENT: ${{ secrets[format('{0}_ENV_VARS', matrix.server.name)] }}
-          REPO_URL: ${{ needs.release.outputs.repo_url }}
-        run: |
-          echo "${ENV_CONTENT}" >  "${{ env.ENV_PATH }}"
-          echo "APP_IMAGE=${{ vars.REGISTRY_URL }}/${{ env.REPO_URL}}":${{ needs.release.outputs.new_version }} >> ${{ env.ENV_PATH}}
-
-      - name: Copy deployment files to remote Server
-        if: ${{ matrix.server.enabled == 'Y' }}
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ matrix.server.hostname }}
-          key: ${{ secrets.TEST_DEPLOY_KEY }}
-          username: ${{ matrix.server.user }}
-          port: ${{ matrix.server.port || 22 }}
-          target: ${{ matrix.server.path }}/${{ env.IMAGE_NAME }}
-          source:  "${{ env.COMPOSE_FILE}}, ${{ env.ENV_PATH }}, ${{ env.START_SCRIPT }} "
-
-      - name: Start services with docker compose
-        if: ${{ matrix.server.enabled == 'Y' }}
-        uses: appleboy/ssh-action@v0.1.5
-        env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REGISTRY_URL: ${{ vars.REGISTRY_URL }}
-          REGISTRY_USERNAME: ${{ vars.REGISTRY_USERNAME }}
-          BASE_IMAGE: ${{ vars.REGISTRY_URL }}/${{ needs.release.outputs.repo_url }}
-        with:
-          host: ${{ matrix.server.hostname }}
-          key: ${{ secrets.TEST_DEPLOY_KEY }}
-          port: ${{ matrix.server.port || 22 }}
-          username: ${{ matrix.server.user }}
-          envs: REGISTRY_URL,REGISTRY_TOKEN,REGISTRY_USERNAME,ENV_FILE
-
-          script: |
-            echo $REGISTRY_TOKEN | docker login $REGISTRY_URL -u $REGISTRY_USERNAME --password-stdin
-
-            cd ~/${{ env.PROD_PATH }}/${{ env.IMAGE_NAME }}
-
-            chmod +x ${{ env.START_SCRIPT }}
-
-            ${{ env.START_SCRIPT }} ${{ env.COMPOSE_FILE }} ${{env.BASE_IMAGE}}
-
     environment:
       name: ${{ matrix.host }}
