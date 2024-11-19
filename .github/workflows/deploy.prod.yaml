@@ -12,34 +12,9 @@ env:
   IMAGE_NAME:  ${{ github.event.repository.name || 'attendance-test' }}
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    outputs:
-      new_version: ${{ steps.versioning.outputs.new_release_version }}
-      release_published: ${{ steps.versioning.outputs.new_release_published }}
-      repo_url: ${{ steps.repo_url.outputs.image_name }}
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Release to GitHub
-        uses: cycjimmy/semantic-release-action@v4
-        id: versioning
-        with:
-          extra_plugins: |
-            @semantic-release/changelog@6.0.0
-            @semantic-release/git
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get repository name
-        id: repo_url
-        run: |
-          echo "image_name=${GITHUB_REPOSITORY@L}" >> ${GITHUB_OUTPUT}
-
   prepare-image:
     if: needs.release.outputs.release_published == 'true'
     runs-on: ubuntu-latest
-    needs: release
     outputs:
       prod_hosts: ${{ steps.generate-hosts.outputs.hosts }}
     steps:
@@ -53,7 +28,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: [prepare-image,release]
+    needs: [prepare-image]
     strategy:
       matrix:
         server: ${{ fromJson(needs.prepare-image.outputs.prod_hosts) }}
