@@ -131,3 +131,4 @@ jobs:
 
     environment:
       name: ${{ matrix.host }}
+      deployment_protection_rule: true
